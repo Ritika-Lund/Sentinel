@@ -1,14 +1,20 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -g -pthread
 
-TARGET = bin/sentinel
-SOURCE = src/main.c
+SRC = $(wildcard src/*.c)
 
-all: $(TARGET)
+all: bin/sentinel bin/worker
 
-$(TARGET): $(SOURCE)
+bin:
 	mkdir -p bin
-	$(CC) $(CFLAGS) $(SOURCE) -o $(TARGET)
+
+bin/sentinel: $(SRC) | bin
+	$(CC) $(CFLAGS) -o $@ $(SRC)
+
+bin/worker: workers/worker.c | bin
+	$(CC) $(CFLAGS) -o $@ workers/worker.c
 
 clean:
 	rm -rf bin
+
+.PHONY: all clean
