@@ -12,5 +12,8 @@ int main(void)
     schedule_fcfs(tasks, 4);
     print_results("FCFS", tasks, 4);
 
+    schedule_sjf(tasks, 4);
+    print_results("SJF", tasks, 4);
+
     return 0;
 }

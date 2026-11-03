@@ -77,3 +77,50 @@ void print_results(const char *algo_name, const Task *tasks, int n)
     printf("Average waiting time:    %.2f\n", total_wait / n);
     printf("Average turnaround time: %.2f\n", total_tat / n);
 }
+
+/* SJF (non-preemptive): whenever the CPU is free, pick the task that
+   has already arrived and has the smallest burst, and run it to the end.
+   Ties: earlier arrival first, then lower id. */
+void schedule_sjf(Task *tasks, int n)
+{
+    scheduler_reset(tasks, n);
+
+    int time = 0;
+    int completed = 0;
+
+    while (completed < n) {
+        int pick = -1;
+
+        for (int i = 0; i < n; i++) {
+            if (tasks[i].done || tasks[i].arrival > time)
+                continue;
+            if (pick == -1 ||
+                tasks[i].burst < tasks[pick].burst ||
+                (tasks[i].burst == tasks[pick].burst &&
+                 (tasks[i].arrival < tasks[pick].arrival ||
+                  (tasks[i].arrival == tasks[pick].arrival &&
+                   tasks[i].id < tasks[pick].id))))
+                pick = i;
+        }
+
+        if (pick == -1) {
+            /* nothing has arrived yet: jump to the earliest arrival */
+            int next = -1;
+            for (int i = 0; i < n; i++) {
+                if (!tasks[i].done && (next == -1 || tasks[i].arrival < next))
+                    next = tasks[i].arrival;
+            }
+            time = next;
+            continue;
+        }
+
+        tasks[pick].start = time;
+        time += tasks[pick].burst;
+        tasks[pick].finish = time;
+        tasks[pick].turnaround = tasks[pick].finish - tasks[pick].arrival;
+        tasks[pick].waiting = tasks[pick].turnaround - tasks[pick].burst;
+        tasks[pick].remaining = 0;
+        tasks[pick].done = 1;
+        completed++;
+    }
+}
