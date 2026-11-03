@@ -12,12 +12,22 @@
 #define MAX_RESTARTS 3
 #define MONITOR_CYCLES 12
 
+volatile sig_atomic_t shutdown_requested = 0;
+
+
+// Handle Ctrl+C
+void handle_sigint(int signal)
+{
+    (void)signal;
+    shutdown_requested = 1;
+}
+
 
 int main(int argc, char *argv[])
 {
     int worker_count = DEFAULT_WORKERS;
 
-    // Read worker count from command-line argument
+    // Validate command-line arguments
 
     if (argc > 2)
     {
@@ -45,6 +55,14 @@ int main(int argc, char *argv[])
         worker_count = (int)value;
     }
 
+    // Register Ctrl+C handler
+
+    if (signal(SIGINT, handle_sigint) == SIG_ERR)
+    {
+        perror("Failed to register SIGINT handler");
+        return 1;
+    }
+
     printf("\n");
     printf("====================================\n");
     printf("       SENTINEL PROCESS SUPERVISOR\n");
@@ -57,7 +75,7 @@ int main(int argc, char *argv[])
 
     const char *worker_path = "./bin/worker";
 
-    // Create workers
+    // Start workers
 
     for (int i = 0; i < worker_count; i++)
     {
@@ -67,6 +85,8 @@ int main(int argc, char *argv[])
         {
             printf("[ERROR] Could not start Worker %d\n",
                    i + 1);
+
+            // Clean up previously started workers
 
             for (int j = 0; j < i; j++)
             {
@@ -78,19 +98,26 @@ int main(int argc, char *argv[])
     }
 
     printf("\n[SENTINEL] All workers started successfully.\n");
+    printf("[SENTINEL] Press Ctrl+C to stop all workers.\n");
 
     // Monitoring loop
 
     for (int cycle = 1;
-         cycle <= MONITOR_CYCLES;
+         cycle <= MONITOR_CYCLES && !shutdown_requested;
          cycle++)
     {
         sleep(1);
 
+        if (shutdown_requested)
+        {
+            break;
+        }
+
         printf("\n[SENTINEL] Monitoring cycle: %d\n",
                cycle);
 
-        // Crash simulation for Worker 1 only
+        // Simulate crashes for testing recovery
+        // Only Worker 1 is deliberately crashed.
 
         if ((cycle == 4 || cycle == 6 ||
              cycle == 8 || cycle == 10) &&
@@ -104,7 +131,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        // Check all workers
+        // Check all workers and recover crashed workers
 
         for (int i = 0; i < worker_count; i++)
         {
@@ -134,7 +161,7 @@ int main(int argc, char *argv[])
         printf("===================================\n");
     }
 
-    // Shutdown all workers
+    // Graceful shutdown
 
     printf("\n[SENTINEL] Shutting down all workers...\n");
 
