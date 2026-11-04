@@ -15,5 +15,8 @@ int main(void)
     schedule_sjf(tasks, 4);
     print_results("SJF", tasks, 4);
 
+    schedule_rr(tasks, 4, 2);
+    print_results("Round Robin (quantum = 2)", tasks, 4);
+
     return 0;
 }
