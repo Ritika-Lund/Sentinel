@@ -8,6 +8,7 @@ typedef enum
 {
     WORKER_NOT_STARTED,
     WORKER_RUNNING,
+    WORKER_PAUSED,
     WORKER_CRASHED,
     WORKER_RESTARTING,
     WORKER_STOPPED,
@@ -34,6 +35,10 @@ int process_start(WorkerProcess *worker,
                   const char *worker_path);
 
 int process_stop(WorkerProcess *worker);
+
+int process_pause(WorkerProcess *worker);
+
+int process_resume(WorkerProcess *worker);
 
 int process_check_exit(WorkerProcess *worker);
 

@@ -21,7 +21,10 @@ const char *process_state_name(WorkerState state)
 
         case WORKER_CRASHED:
             return "CRASHED";
-
+        
+        case WORKER_PAUSED:
+            return "PAUSED";
+        
         case WORKER_RESTARTING:
             return "RESTARTING";
 
@@ -156,7 +159,67 @@ int process_check_exit(WorkerProcess *worker)
            process_state_name(worker->state));
 
     return 1;
+}// Pause a running worker
+int process_pause(WorkerProcess *worker)
+{
+    if (worker == NULL || worker->pid <= 0)
+    {
+        return -1;
+    }
+
+    if (worker->state != WORKER_RUNNING)
+    {
+        return -1;
+    }
+
+    if (kill(worker->pid, SIGSTOP) == -1)
+    {
+        perror("Failed to pause worker");
+        return -1;
+    }
+
+    worker->state = WORKER_PAUSED;
+
+    printf("[SENTINEL] Worker %d paused.\n",
+           worker->worker_id);
+
+    printf("[STATE] Worker %d: %s\n",
+           worker->worker_id,
+           process_state_name(worker->state));
+
+    return 0;
 }
+// Resume a paused worker
+int process_resume(WorkerProcess *worker)
+{
+    if (worker == NULL || worker->pid <= 0)
+    {
+        return -1;
+    }
+
+    if (worker->state != WORKER_PAUSED)
+    {
+        return -1;
+    }
+
+    if (kill(worker->pid, SIGCONT) == -1)
+    {
+        perror("Failed to resume worker");
+        return -1;
+    }
+
+    worker->state = WORKER_RUNNING;
+
+    printf("[SENTINEL] Worker %d resumed.\n",
+           worker->worker_id);
+
+    printf("[STATE] Worker %d: %s\n",
+           worker->worker_id,
+           process_state_name(worker->state));
+
+    return 0;
+}
+
 
 
 // Stop a running worker

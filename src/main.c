@@ -96,6 +96,15 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
+    // Temporary pause and resume test
+
+printf("\n[TEST] Pausing Worker 1...\n");
+process_pause(&workers[0]);
+
+sleep(3);
+
+printf("\n[TEST] Resuming Worker 1...\n");
+process_resume(&workers[0]);
 
     printf("\n[SENTINEL] All workers started successfully.\n");
     printf("[SENTINEL] Press Ctrl+C to stop all workers.\n");
@@ -134,16 +143,17 @@ int main(int argc, char *argv[])
         // Check all workers and recover crashed workers
 
         for (int i = 0; i < worker_count; i++)
-        {
-            if (workers[i].state == WORKER_RUNNING)
-            {
-                recovery_check_and_restart(
-                    &workers[i],
-                    worker_path,
-                    MAX_RESTARTS
-                );
-            }
-        }
+{
+    if (workers[i].state == WORKER_RUNNING ||
+        workers[i].state == WORKER_PAUSED)
+    {
+        recovery_check_and_restart(
+            &workers[i],
+            worker_path,
+            MAX_RESTARTS
+        );
+    }
+}
 
         // Display worker status
 
