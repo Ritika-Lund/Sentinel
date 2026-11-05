@@ -223,6 +223,8 @@ int process_resume(WorkerProcess *worker)
 
 
 // Stop a running worker
+
+// Stop a running or paused worker
 int process_stop(WorkerProcess *worker)
 {
     if (worker == NULL)
@@ -238,12 +240,24 @@ int process_stop(WorkerProcess *worker)
     printf("[SENTINEL] Stopping worker %d (PID: %d)\n",
            worker->worker_id, worker->pid);
 
+    // Resume a paused worker before sending SIGTERM
+    if (worker->state == WORKER_PAUSED)
+    {
+        if (kill(worker->pid, SIGCONT) == -1 && errno != ESRCH)
+        {
+            perror("Failed to resume paused worker");
+            return -1;
+        }
+    }
+
+    // Request worker termination
     if (kill(worker->pid, SIGTERM) == -1 && errno != ESRCH)
     {
         perror("kill failed");
         return -1;
     }
 
+    // Wait for worker termination
     int status;
     pid_t result;
 

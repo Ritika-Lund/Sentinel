@@ -98,8 +98,6 @@ int main(int argc, char *argv[])
     }
     // Temporary pause and resume test
 
-
-
     printf("\n[SENTINEL] All workers started successfully.\n");
     printf("[SENTINEL] Press Ctrl+C to stop all workers.\n");
 
