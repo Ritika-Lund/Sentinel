@@ -3,11 +3,11 @@
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "process.h"
 #include "recovery.h"
 
-#define MAX_WORKERS 10
 #define DEFAULT_WORKERS 5
 #define MAX_RESTARTS 3
 #define MONITOR_CYCLES 12
@@ -71,32 +71,48 @@ int main(int argc, char *argv[])
     printf("[SENTINEL] Configured workers: %d\n\n",
            worker_count);
 
-    WorkerProcess workers[MAX_WORKERS] = {0};
+    // Initialize global worker list
+
+    pthread_mutex_lock(&g_workers_lock);
+
+    g_worker_count = worker_count;
+
+    for (int i = 0; i < MAX_WORKERS; i++)
+    {
+        g_workers[i].worker_id = 0;
+        g_workers[i].pid = 0;
+        g_workers[i].restart_count = 0;
+        g_workers[i].state = WORKER_NOT_STARTED;
+        g_workers[i].pipe_read_fd = -1;
+    }
+
+    pthread_mutex_unlock(&g_workers_lock);
 
     const char *worker_path = "./bin/worker";
 
     // Start workers
 
-    for (int i = 0; i < worker_count; i++)
+    for (int i = 0; i < g_worker_count; i++)
     {
-        if (process_start(&workers[i],
+        if (process_start(&g_workers[i],
                           i + 1,
                           worker_path) != 0)
         {
             printf("[ERROR] Could not start Worker %d\n",
                    i + 1);
 
-            // Clean up previously started workers
-
             for (int j = 0; j < i; j++)
             {
-                process_stop(&workers[j]);
+                process_stop(&g_workers[j]);
             }
+
+            pthread_mutex_lock(&g_workers_lock);
+            g_worker_count = 0;
+            pthread_mutex_unlock(&g_workers_lock);
 
             return 1;
         }
     }
-    // Temporary pause and resume test
 
     printf("\n[SENTINEL] All workers started successfully.\n");
     printf("[SENTINEL] Press Ctrl+C to stop all workers.\n");
@@ -117,16 +133,23 @@ int main(int argc, char *argv[])
         printf("\n[SENTINEL] Monitoring cycle: %d\n",
                cycle);
 
-        // Simulate crashes for testing recovery
+        // Crash simulation for testing
         // Only Worker 1 is deliberately crashed.
+
+        pthread_mutex_lock(&g_workers_lock);
+
+        pid_t first_worker_pid = g_workers[0].pid;
+        WorkerState first_worker_state = g_workers[0].state;
+
+        pthread_mutex_unlock(&g_workers_lock);
 
         if ((cycle == 4 || cycle == 6 ||
              cycle == 8 || cycle == 10) &&
-             workers[0].state == WORKER_RUNNING)
+             first_worker_state == WORKER_RUNNING)
         {
             printf("\n[TEST] Simulating Worker 1 crash...\n");
 
-            if (kill(workers[0].pid, SIGKILL) == -1)
+            if (kill(first_worker_pid, SIGKILL) == -1)
             {
                 perror("Failed to simulate crash");
             }
@@ -134,31 +157,41 @@ int main(int argc, char *argv[])
 
         // Check all workers and recover crashed workers
 
-        for (int i = 0; i < worker_count; i++)
-{
-    if (workers[i].state == WORKER_RUNNING ||
-        workers[i].state == WORKER_PAUSED)
-    {
-        recovery_check_and_restart(
-            &workers[i],
-            worker_path,
-            MAX_RESTARTS
-        );
-    }
-}
+        for (int i = 0; i < g_worker_count; i++)
+        {
+            pthread_mutex_lock(&g_workers_lock);
+
+            WorkerState state = g_workers[i].state;
+
+            pthread_mutex_unlock(&g_workers_lock);
+
+            if (state == WORKER_RUNNING ||
+                state == WORKER_PAUSED)
+            {
+                recovery_check_and_restart(
+                    &g_workers[i],
+                    worker_path,
+                    MAX_RESTARTS
+                );
+            }
+        }
 
         // Display worker status
 
         printf("\n========== WORKER STATUS ==========\n");
 
-        for (int i = 0; i < worker_count; i++)
+        pthread_mutex_lock(&g_workers_lock);
+
+        for (int i = 0; i < g_worker_count; i++)
         {
             printf("Worker %d | PID: %d | State: %s | Restarts: %d\n",
-                   workers[i].worker_id,
-                   workers[i].pid,
-                   process_state_name(workers[i].state),
-                   workers[i].restart_count);
+                   g_workers[i].worker_id,
+                   g_workers[i].pid,
+                   process_state_name(g_workers[i].state),
+                   g_workers[i].restart_count);
         }
+
+        pthread_mutex_unlock(&g_workers_lock);
 
         printf("===================================\n");
     }
@@ -167,9 +200,9 @@ int main(int argc, char *argv[])
 
     printf("\n[SENTINEL] Shutting down all workers...\n");
 
-    for (int i = 0; i < worker_count; i++)
+    for (int i = 0; i < g_worker_count; i++)
     {
-        process_stop(&workers[i]);
+        process_stop(&g_workers[i]);
     }
 
     printf("\n[SENTINEL] Shutdown complete.\n");
