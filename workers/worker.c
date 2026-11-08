@@ -4,6 +4,9 @@
 
 int main(int argc, char *argv[])
 {
+    // Send output line by line through the pipe
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
     if (argc != 2)
     {
         fprintf(stderr, "Worker ID is required.\n");

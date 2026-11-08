@@ -2,6 +2,9 @@
 #define PROCESS_H
 
 #include <sys/types.h>
+#include <pthread.h>
+
+#define MAX_WORKERS 10
 
 // Possible states of a worker process
 typedef enum
@@ -24,8 +27,15 @@ typedef struct
     pid_t pid;
     int restart_count;
     WorkerState state;
+    int pipe_read_fd;
 
 } WorkerProcess;
+
+
+// Global worker list and synchronization
+extern WorkerProcess g_workers[MAX_WORKERS];
+extern int g_worker_count;
+extern pthread_mutex_t g_workers_lock;
 
 
 // Process management functions
