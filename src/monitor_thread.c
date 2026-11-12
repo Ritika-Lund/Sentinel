@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-#include <signal.h>
+#include <stdatomic.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <pthread.h>
 #include "monitor_thread.h"
@@ -9,8 +10,8 @@
 #define MON_MAX 64
 
 static pthread_t g_thread;
-static int g_started = 0;
-static volatile sig_atomic_t g_stop = 0;
+static atomic_bool g_started = false;
+static atomic_bool g_stop = false;
 
 static WorkerProcess *s_workers = NULL;
 static int g_count = 0;
@@ -45,7 +46,7 @@ static void *monitor_loop(void *arg)
     (void)arg;
     unsigned long cycle = 0;
 
-    while (!g_stop)
+    while (!atomic_load(&g_stop))
     {
         pid_t pids[MON_MAX];
         int ids[MON_MAX];
@@ -116,7 +117,7 @@ static void *monitor_loop(void *arg)
         cycle++;
 
         /* sleep 1 second in small slices so monitor_stop() is quick */
-        for (int k = 0; k < 10 && !g_stop; k++)
+        for (int k = 0; k < 10 && !atomic_load(&g_stop); k++)
             usleep(100000);
     }
     return NULL;
@@ -124,13 +125,14 @@ static void *monitor_loop(void *arg)
 
 int monitor_start(WorkerProcess *workers, int count, pthread_mutex_t *lock)
 {
-    if (g_started || !workers || !lock || count < 1 || count > MON_MAX)
+    if (atomic_load(&g_started) || !workers || !lock ||
+        count < 1 || count > MON_MAX)
         return -1;
 
     s_workers = workers;
     g_count = count;
     g_lock = lock;
-    g_stop = 0;
+    atomic_store(&g_stop, false);
 
     memset(g_stats, 0, sizeof g_stats);
     memset(g_stats_pid, 0, sizeof g_stats_pid);
@@ -140,18 +142,17 @@ int monitor_start(WorkerProcess *workers, int count, pthread_mutex_t *lock)
 
     if (pthread_create(&g_thread, NULL, monitor_loop, NULL) != 0)
         return -1;
-    g_started = 1;
+    atomic_store(&g_started, true);
     log_event("INFO", "Monitor thread started (%d workers)", count);
     return 0;
 }
 
 void monitor_stop(void)
 {
-    if (!g_started)
+    if (!atomic_exchange(&g_started, false))
         return;
-    g_stop = 1;
+    atomic_store(&g_stop, true);
     pthread_join(g_thread, NULL);
-    g_started = 0;
     log_event("INFO", "Monitor thread stopped");
 }
 
@@ -170,4 +171,3 @@ int monitor_get_stats(int index, proc_stats_t *out)
     pthread_mutex_unlock(&g_stats_lock);
     return rc;
 }
-
