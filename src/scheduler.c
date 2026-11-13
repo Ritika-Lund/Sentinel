@@ -4,6 +4,9 @@
 
 void task_init(Task *t, int id, pid_t pid, int arrival, int burst)
 {
+    if (t == NULL || arrival < 0 || burst <= 0)
+        return;
+
     t->id = id;
     t->pid = pid;
     t->arrival = arrival;
@@ -40,6 +43,12 @@ static int cmp_arrival(const void *a, const void *b)
 
 void schedule_fcfs(Task *tasks, int n)
 {
+    if (tasks == NULL || n <= 0 || n > MAX_TASKS)
+    {
+        fprintf(stderr, "Invalid scheduler arguments\n");
+        return;
+    }
+
     scheduler_reset(tasks, n);
     qsort(tasks, n, sizeof(Task), cmp_arrival);
 
@@ -60,6 +69,12 @@ void schedule_fcfs(Task *tasks, int n)
 
 void print_results(const char *algo_name, const Task *tasks, int n)
 {
+    if (algo_name == NULL || tasks == NULL || n <= 0)
+    {
+        fprintf(stderr, "print_results: invalid arguments\n");
+        return;
+    }
+
     double total_wait = 0, total_tat = 0;
 
     printf("\n=== %s ===\n", algo_name);
@@ -83,6 +98,12 @@ void print_results(const char *algo_name, const Task *tasks, int n)
    Ties: earlier arrival first, then lower id. */
 void schedule_sjf(Task *tasks, int n)
 {
+    if (tasks == NULL || n <= 0 || n > MAX_TASKS)
+    {
+        fprintf(stderr, "Invalid scheduler arguments\n");
+        return;
+    }
+
     scheduler_reset(tasks, n);
 
     int time = 0;

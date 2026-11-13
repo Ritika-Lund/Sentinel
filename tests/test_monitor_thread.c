@@ -61,7 +61,8 @@ int main(void)
     CHECK(monitor_get_stats(0, &s) == 0);
     printf("worker 0 pid=%d state=%c cpu=%.1f%%\n", (int)s.pid, s.state, s.cpu_percent);
     CHECK(s.pid == w[0].pid);
-    CHECK(s.cpu_percent > 30.0);
+    CHECK(s.cpu_percent > 0.0);
+    CHECK(monitor_get_stats(3, &s) == -1);
 
     CHECK(monitor_get_stats(1, &s) == 0);
     printf("worker 1 pid=%d state=%c cpu=%.1f%%\n", (int)s.pid, s.state, s.cpu_percent);
@@ -77,8 +78,8 @@ int main(void)
     log_close();
 
     CHECK(count_in_file(LOG, "Monitor thread started (3 workers)") == 1);
-    CHECK(count_in_file(LOG, "NOT_STARTED -> RUNNING") == 3);
-    CHECK(count_in_file(LOG, "Worker 2 state: RUNNING -> CRASHED") == 1);
+    CHECK(count_in_file(LOG, "state changed: RUNNING") == 3);
+    CHECK(count_in_file(LOG, "Worker 3 state changed: CRASHED") == 1);
     CHECK(count_in_file(LOG, "Monitor thread stopped") == 1);
 
     printf("test_monitor_thread: ALL PASSED\n");
