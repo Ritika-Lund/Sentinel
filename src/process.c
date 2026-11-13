@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
-
+#include "ipc.h"
 #include "process.h"
 
 
@@ -194,6 +194,16 @@ int process_check_exit(WorkerProcess *worker)
     {
         perror("waitpid failed");
         return -1;
+    }
+
+    /* Drain output only after waitpid confirms the worker has exited. */
+    if (ipc_drain_worker(worker) != 0)
+    {
+        pthread_mutex_lock(&g_workers_lock);
+
+        close_worker_pipe_locked(worker);
+
+        pthread_mutex_unlock(&g_workers_lock);
     }
 
     pthread_mutex_lock(&g_workers_lock);
@@ -399,6 +409,17 @@ int process_stop(WorkerProcess *worker)
         return -1;
     }
 
+    /*
+ * Drain remaining worker output before closing its pipe.
+ */
+if (ipc_drain_worker(worker) != 0)
+{
+    pthread_mutex_lock(&g_workers_lock);
+
+    close_worker_pipe_locked(worker);
+
+    pthread_mutex_unlock(&g_workers_lock);
+}
     pthread_mutex_lock(&g_workers_lock);
 
     if (worker->pid == pid)
